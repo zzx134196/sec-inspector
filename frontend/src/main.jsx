@@ -8,21 +8,33 @@ import App from './App'
 import './index.css'
 import applyGapPolyfill from './utils/flexGapPolyfill'
 
-// 检测并修复 flex gap 不支持的浏览器（如360信创浏览器）
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', applyGapPolyfill)
-} else {
+function initPolyfill() {
   applyGapPolyfill()
+  setTimeout(applyGapPolyfill, 500)
+  setTimeout(applyGapPolyfill, 2000)
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <StyleProvider hashPriority="high" transformers={[legacyLogicalPropertiesTransformer]}>
-      <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#1677ff' } }}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ConfigProvider>
-    </StyleProvider>
-  </React.StrictMode>
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPolyfill)
+} else {
+  initPolyfill()
+}
+
+var root = document.getElementById('root')
+ReactDOM.createRoot(root).render(
+  <StyleProvider hashPriority="high" transformers={[legacyLogicalPropertiesTransformer]}>
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        token: { colorPrimary: '#1677ff' },
+        components: {
+          Button: { contentFontSize: 14 },
+        },
+      }}
+    >
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ConfigProvider>
+  </StyleProvider>
 )

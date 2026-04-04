@@ -201,6 +201,69 @@ html, body, #root {
   margin: 0 5px 10px 5px;
 }
 
+/* ============ Ant Design 5 Chrome 83 兼容覆写 ============ */
+
+.no-flex-gap .ant-btn > span + .anticon,
+.no-flex-gap .ant-btn > .anticon + span,
+.no-flex-gap .ant-btn > span + span {
+  margin-left: 8px;
+}
+
+.no-flex-gap .ant-space-item + .ant-space-item {
+  margin-left: 8px;
+}
+.no-flex-gap .ant-space-vertical .ant-space-item + .ant-space-item {
+  margin-left: 0;
+  margin-top: 8px;
+}
+
+.no-flex-gap .ant-dropdown-menu-item > span + span,
+.no-flex-gap .ant-dropdown-menu-item > .anticon + span {
+  margin-left: 8px;
+}
+
+.no-flex-gap .ant-form-item + .ant-form-item {
+  margin-top: 16px;
+}
+
+.no-flex-gap .ant-upload-list-item {
+  margin-top: 8px;
+}
+
+.no-flex-gap .ant-modal-footer .ant-btn + .ant-btn {
+  margin-left: 8px;
+}
+
+.no-flex-gap .ant-tag + .ant-tag {
+  margin-left: 4px;
+}
+
+.no-flex-gap .ant-tabs-tab + .ant-tabs-tab {
+  margin-left: 24px;
+}
+
+.no-flex-gap .ant-collapse-item + .ant-collapse-item {
+  margin-top: 8px;
+}
+
+.ant-layout {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+}
+.ant-layout-content {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  flex: 1;
+}
+
+.ant-upload {
+  display: inline-block;
+}
+.ant-upload input[type="file"] {
+  cursor: pointer;
+}
+
 /* 对话消息动画 */
 @-webkit-keyframes fadeIn {
   from { opacity: 0; -webkit-transform: translateY(8px); transform: translateY(8px); }
