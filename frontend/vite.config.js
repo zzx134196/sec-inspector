@@ -8,15 +8,25 @@ export default defineConfig({
     legacy({
       targets: ['Chrome >= 63', 'Firefox >= 60', 'Safari >= 11.1'],
       additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
-      modernPolyfills: true,
+      modernPolyfills: [
+        'es.promise',
+        'es.promise.finally',
+        'es.array.flat',
+        'es.array.flat-map',
+        'es.object.from-entries',
+        'es.string.match-all',
+        'es.global-this',
+      ],
+      renderLegacyChunks: true,
     }),
   ],
   esbuild: {
-    target: 'chrome69',
+    target: 'es2015',
   },
   build: {
     target: 'es2015',
     cssTarget: 'chrome63',
+    minify: 'terser',
   },
   server: {
     port: 8003,
