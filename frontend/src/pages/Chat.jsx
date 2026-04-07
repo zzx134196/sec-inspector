@@ -360,7 +360,7 @@ function WelcomeScreen({ onSend }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, textAlign: 'left' }}>
+      <div className="welcome-grid" style={{ textAlign: 'left' }}>
         {features.map((item, i) => (
           <div key={i} className="flex-gap-12" style={{ padding: '14px 16px', borderRadius: 10, cursor: 'default', background: '#fff', border: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', transition: 'all 0.25s' }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = item.color; e.currentTarget.style.boxShadow = `0 2px 12px ${item.color}18` }}

@@ -48,7 +48,7 @@ const useAuthStore = create((set, get) => ({
       } else {
         get().logout()
       }
-    } catch {
+    } catch (e) {
       console.warn('获取用户信息失败，保留 token 等待重试')
     }
   },
