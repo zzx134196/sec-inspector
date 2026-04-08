@@ -203,49 +203,76 @@ html, body, #root {
 
 /* ============ Ant Design 5 Chrome 83 兼容覆写 ============ */
 
+/* Ant Design Space — antd5 直接在 .ant-space 上设 gap，Chrome 83 不支持 */
+.no-flex-gap .ant-space {
+  gap: 0 !important;
+}
+.no-flex-gap .ant-space-horizontal > .ant-space-item + .ant-space-item {
+  margin-left: 8px !important;
+}
+.no-flex-gap .ant-space-vertical > .ant-space-item + .ant-space-item {
+  margin-left: 0 !important;
+  margin-top: 8px !important;
+}
+.no-flex-gap .ant-space-horizontal.ant-space-compact > .ant-space-item + .ant-space-item {
+  margin-left: 0 !important;
+}
+
+/* Ant Design Button 图标+文字间距 */
 .no-flex-gap .ant-btn > span + .anticon,
 .no-flex-gap .ant-btn > .anticon + span,
 .no-flex-gap .ant-btn > span + span {
   margin-left: 8px;
 }
 
-.no-flex-gap .ant-space-item + .ant-space-item {
-  margin-left: 8px;
-}
-.no-flex-gap .ant-space-vertical .ant-space-item + .ant-space-item {
-  margin-left: 0;
-  margin-top: 8px;
-}
-
+/* Ant Design Dropdown / Menu */
 .no-flex-gap .ant-dropdown-menu-item > span + span,
 .no-flex-gap .ant-dropdown-menu-item > .anticon + span {
   margin-left: 8px;
 }
 
+/* Ant Design Form 项间距 */
 .no-flex-gap .ant-form-item + .ant-form-item {
   margin-top: 16px;
 }
 
+/* Ant Design Upload — 不强制覆盖 input 定位，保持 Ant Design 5 原生行为 */
+.no-flex-gap .ant-upload-wrapper {
+  display: inline-block;
+}
+.no-flex-gap .ant-upload {
+  display: inline-block;
+  cursor: pointer;
+}
+.no-flex-gap .ant-upload .ant-btn {
+  pointer-events: auto;
+}
+/* Upload 列表 */
 .no-flex-gap .ant-upload-list-item {
   margin-top: 8px;
 }
 
+/* Ant Design Modal footer 按钮间距 */
 .no-flex-gap .ant-modal-footer .ant-btn + .ant-btn {
   margin-left: 8px;
 }
 
+/* Ant Design Tag 间距 */
 .no-flex-gap .ant-tag + .ant-tag {
   margin-left: 4px;
 }
 
+/* Ant Design Tabs */
 .no-flex-gap .ant-tabs-tab + .ant-tabs-tab {
   margin-left: 24px;
 }
 
+/* Ant Design Collapse */
 .no-flex-gap .ant-collapse-item + .ant-collapse-item {
   margin-top: 8px;
 }
 
+/* 确保 Ant Design Layout 在旧浏览器正常工作 */
 .ant-layout {
   display: -webkit-box;
   display: -ms-flexbox;
@@ -256,36 +283,13 @@ html, body, #root {
   -ms-flex: 1;
   flex: 1;
 }
-
-/* Ant Design Upload 的点击区域修复（Chrome 83 增强） */
-.ant-upload {
-  display: inline-block;
-  position: relative;
-  cursor: pointer;
-}
-.ant-upload-wrapper {
-  display: inline-block;
-}
-.ant-upload input[type="file"] {
-  cursor: pointer;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  z-index: 1;
-}
-/* 确保 Upload 按钮容器可点击 */
-.ant-upload .ant-btn {
-  position: relative;
-  z-index: 0;
-  pointer-events: auto;
-}
-/* Upload 按钮内 flex gap 修复不应影响点击 */
-.no-flex-gap .ant-upload,
-.no-flex-gap .ant-upload-wrapper {
-  display: inline-block;
+.ant-layout-header {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
 }
 
 /* CSS Grid gap fallback（Chrome 84 才支持标准 gap，83 需要 grid-gap） */
@@ -340,6 +344,21 @@ html, body, #root {
   -webkit-box-align: center;
   -ms-flex-align: center;
   align-items: center;
+}
+
+/* Ant Design Progress 兼容 */
+.no-flex-gap .ant-progress-outer {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+}
+
+/* Ant Design Tooltip / Popover 内间距 */
+.no-flex-gap .ant-tooltip-inner > span + span {
+  margin-left: 4px;
 }
 
 /* 对话消息动画 */

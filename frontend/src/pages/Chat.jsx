@@ -254,7 +254,7 @@ export default function ChatPage() {
       {/* 主内容区 */}
       <Layout>
         <Header style={{ background: '#fff', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f0f0f0', height: 52, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <Space align="center">
+          <div className="flex-gap-8" style={{ display: 'flex', alignItems: 'center' }}>
             <Button type="text" icon={sideCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setSideCollapsed(!sideCollapsed)} style={{ fontSize: 16 }} />
             <div className="flex-gap-8" style={{ display: 'flex', alignItems: 'center' }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: 'linear-gradient(135deg, #1677ff, #4096ff)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -262,13 +262,13 @@ export default function ChatPage() {
               </div>
               <Title level={4} style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>等保测评助手</Title>
             </div>
-          </Space>
+          </div>
           <Dropdown menu={userMenu} placement="bottomRight">
-            <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8 }}>
+            <div className="flex-gap-8" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '4px 8px', borderRadius: 8 }}>
               <Avatar size={28} icon={<UserOutlined />} style={{ background: 'linear-gradient(135deg, #1677ff, #4096ff)' }} />
               <Text style={{ fontSize: 13 }}>{user?.display_name || user?.username}</Text>
               {user?.role === 'admin' && <Tag color="blue" style={{ margin: 0, fontSize: 11, lineHeight: '18px', height: 20 }}>管理员</Tag>}
-            </Space>
+            </div>
           </Dropdown>
         </Header>
 
