@@ -218,12 +218,13 @@ export default function ChatPage() {
       {/* 左侧栏 */}
       <Sider
         width={260} collapsedWidth={0} collapsed={sideCollapsed} trigger={null}
-        style={{ background: 'linear-gradient(180deg, #fff 0%, #fafbfc 100%)', borderRight: '1px solid #eee', overflow: 'auto' }}
+        className="app-sidebar"
+        style={{ overflow: 'auto' }}
       >
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0f0f0' }}>
+        <div className="sidebar-divider-bottom" style={{ padding: '14px 16px' }}>
           <Button
-            type="primary" icon={<PlusOutlined />} block onClick={handleNewChat}
-            style={{ borderRadius: 8, height: 40, fontWeight: 500, background: 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)', border: 'none', boxShadow: '0 2px 8px rgba(22,119,255,0.3)' }}
+            icon={<PlusOutlined />} block onClick={handleNewChat}
+            style={{ borderRadius: 8, height: 40, fontWeight: 500, background: 'rgba(255, 255, 255, 0.15)', color: '#fff', border: 'none' }}
           >
             新对话
           </Button>
@@ -232,13 +233,13 @@ export default function ChatPage() {
         {/* 历史对话 */}
         {conversations.length > 0 && (
           <>
-            <div style={{ padding: '14px 16px 6px', borderTop: '1px solid #f0f0f0', marginTop: 4 }}>
-              <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1 }}>历史对话</Text>
+            <div className="sidebar-divider-top" style={{ padding: '14px 16px 6px', marginTop: 4 }}>
+              <Text style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1 }}>历史对话</Text>
             </div>
             <div style={{ padding: '0 8px', maxHeight: 240, overflow: 'auto' }}>
               {conversations.slice(0, 20).map((conv) => (
-                <div key={conv.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 2, borderRadius: 4, background: conv.id === currentConvId ? '#e6f4ff' : undefined }}>
-                  <Button type="text" size="small" style={{ flex: 1, textAlign: 'left', height: 32, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                <div key={conv.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 2, borderRadius: 4 }}>
+                  <Button className={`sidebar-menu-btn ${conv.id === currentConvId ? 'active' : ''}`} type="text" size="small" style={{ flex: 1, textAlign: 'left', height: 32, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     onClick={() => loadMessages(conv.id)}>{conv.title}</Button>
                   <CloseOutlined style={{ fontSize: 10, color: '#999', padding: '0 6px', cursor: 'pointer', flexShrink: 0 }}
                     onClick={(e) => { e.stopPropagation(); handleDeleteConv(conv.id) }} />

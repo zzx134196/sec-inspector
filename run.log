@@ -1,0 +1,33 @@
+🚀 等保测评助手 启动中...
+📦 启动后端 (端口8022)...
+INFO:     Started server process [59170]
+INFO:     Waiting for application startup.
+2026-04-14 15:33:43.750 | INFO     | app.main:startup:52 - 🚀 等保测评助手 v1.0.0 启动中...
+2026-04-14 15:33:43.753 | INFO     | app.main:startup:60 - ✅ 数据库表已就绪
+2026-04-14 15:33:43.760 | INFO     | app.main:startup:69 - ✅ 等保测评助手 启动完成
+2026-04-14 15:33:43.760 | INFO     | app.main:startup:70 - 📖 API文档: http://0.0.0.0:8021/docs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8022 (Press CTRL+C to quit)
+🎨 启动前端 (端口8003)...
+
+> sec-inspector-frontend@1.0.0 dev
+> vite
+
+
+  VITE v5.4.21  ready in 471 ms
+
+  ➜  Local:   http://localhost:8003/
+  ➜  Network: http://192.168.100.200:8003/
+
+✅ 启动完成！
+================================
+  前端界面: http://localhost:8003
+  API文档:  http://localhost:8022/docs
+  账号:     admin / admin123
+================================
+
+按 Ctrl+C 停止所有服务
+2026-04-14 15:35:13.257 | WARNING  | app.core.auth:decode_jwt_token:42 - JWT 验证失败: Signature has expired.
+INFO:     127.0.0.1:52155 - "GET /api/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:52803 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52807 - "GET /api/chat/conversations HTTP/1.1" 200 OK
