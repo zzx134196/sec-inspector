@@ -377,12 +377,50 @@ function WelcomeScreen({ onSend }) {
 }
 
 
+function formatMessageContent(content) {
+  if (!content || typeof content !== 'string') return content || ''
+  var text = content
+
+  text = text.replace(/```json\s*([\s\S]*?)```/g, function(match, jsonStr) {
+    try {
+      var obj = JSON.parse(jsonStr.trim())
+      return '```json\n' + JSON.stringify(obj, null, 2) + '\n```'
+    } catch (e) {
+      return match
+    }
+  })
+
+  text = text.replace(/(?:^|\n)(\{[\s\S]*?\})(?:\n|$)/g, function(match, jsonStr) {
+    if (jsonStr.length < 50) return match
+    try {
+      var obj = JSON.parse(jsonStr.trim())
+      return '\n```json\n' + JSON.stringify(obj, null, 2) + '\n```\n'
+    } catch (e) {
+      return match
+    }
+  })
+
+  text = text.replace(/(?:^|\n)(\[[\s\S]*?\])(?:\n|$)/g, function(match, jsonStr) {
+    if (jsonStr.length < 50) return match
+    try {
+      var obj = JSON.parse(jsonStr.trim())
+      return '\n```json\n' + JSON.stringify(obj, null, 2) + '\n```\n'
+    } catch (e) {
+      return match
+    }
+  })
+
+  return text
+}
+
 function MessageBubble({ msg }) {
   const isUser = msg.role === 'user'
-  // 必须转成布尔值，否则 msg.thinkingContent 变化会导致 useEffect 持续触发强制展开
   const isStreaming = !msg.content && !!msg.thinkingContent
   const [thinkingExpanded, setThinkingExpanded] = React.useState(true)
   const thinkingRef = React.useRef(null)
+  const displayContent = React.useMemo(function() {
+    return formatMessageContent(msg.content)
+  }, [msg.content])
 
   // 开始流式输出时自动展开
   React.useEffect(() => {
@@ -461,26 +499,28 @@ function MessageBubble({ msg }) {
           </div>
         )}
         {isUser ? (msg.content || (msg.attachment ? '请结合我上传的附件进行分析。' : '')) : (
-          <div style={{ whiteSpace: 'normal' }}>
+          <div style={{ whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
             <ReactMarkdown
               components={{
                 h1: ({children}) => <h3 style={{margin: '12px 0 6px', fontSize: 16, fontWeight: 600}}>{children}</h3>,
                 h2: ({children}) => <h4 style={{margin: '10px 0 4px', fontSize: 15, fontWeight: 600}}>{children}</h4>,
                 h3: ({children}) => <h5 style={{margin: '8px 0 4px', fontSize: 14, fontWeight: 600}}>{children}</h5>,
-                p: ({children}) => <p style={{margin: '4px 0', lineHeight: 1.7}}>{children}</p>,
+                p: ({children}) => <p style={{margin: '4px 0', lineHeight: 1.7, overflowWrap: 'break-word', wordBreak: 'break-word'}}>{children}</p>,
                 ul: ({children}) => <ul style={{margin: '4px 0', paddingLeft: 20}}>{children}</ul>,
                 ol: ({children}) => <ol style={{margin: '4px 0', paddingLeft: 20}}>{children}</ol>,
                 li: ({children}) => <li style={{margin: '2px 0'}}>{children}</li>,
                 strong: ({children}) => <strong style={{fontWeight: 600}}>{children}</strong>,
-                table: ({children}) => <table style={{borderCollapse: 'collapse', margin: '8px 0', fontSize: 12, width: '100%'}}>{children}</table>,
-                th: ({children}) => <th style={{border: '1px solid #e8e8e8', padding: '6px 10px', background: '#fafafa', fontWeight: 600, textAlign: 'left'}}>{children}</th>,
+                table: ({children}) => <div style={{overflowX: 'auto', maxWidth: '100%', margin: '8px 0'}}><table style={{borderCollapse: 'collapse', fontSize: 12, width: '100%', minWidth: 300}}>{children}</table></div>,
+                th: ({children}) => <th style={{border: '1px solid #e8e8e8', padding: '6px 10px', background: '#fafafa', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap'}}>{children}</th>,
                 td: ({children}) => <td style={{border: '1px solid #e8e8e8', padding: '6px 10px'}}>{children}</td>,
                 blockquote: ({children}) => <blockquote style={{borderLeft: '3px solid #1677ff', margin: '8px 0', paddingLeft: 12, color: '#666'}}>{children}</blockquote>,
-                code: ({inline, children}) => inline
-                  ? <code style={{background: '#f5f5f5', padding: '1px 4px', borderRadius: 3, fontSize: '0.9em'}}>{children}</code>
-                  : <pre style={{background: '#f5f5f5', padding: 8, borderRadius: 4, overflow: 'auto', fontSize: 12}}><code>{children}</code></pre>,
+                pre: ({children}) => <pre style={{background: '#f5f5f5', padding: 10, borderRadius: 6, overflowX: 'auto', maxWidth: '100%', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{children}</pre>,
+                code: ({inline, className, children}) => {
+                  if (inline) return <code style={{background: '#f5f5f5', padding: '1px 4px', borderRadius: 3, fontSize: '0.9em', wordBreak: 'break-all'}}>{children}</code>
+                  return <code style={{fontFamily: 'Consolas, Monaco, "Courier New", monospace'}}>{children}</code>
+                },
               }}
-            >{msg.content || ''}</ReactMarkdown>
+            >{displayContent}</ReactMarkdown>
           </div>
         )}
         {msg.metadata?.data && <StructuredDataCard data={msg.metadata.data} />}
