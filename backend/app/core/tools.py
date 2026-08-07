@@ -63,16 +63,37 @@ async def handle_audit_report(
         except Exception as e:
             logger.warning(f"查找参考模板失败: {e}")
 
-    # 2. 调用审核引擎
+    # 2. 调用审核引擎（大文件自动分段）
+    from app.core.audit import audit_eval_chunked, MAX_CHUNK_CHARS
+    on_thinking = kwargs.get("on_thinking")
+
+    async def _progress_callback(current: int, total: int):
+        if on_thinking:
+            await on_thinking(f"正在审核第 {current}/{total} 段...")
+
     try:
-        audit_result = await audit_eval_description(
-            content=content,
-            control_point=control_point,
-            object_type=object_type,
-            result_type=result_type,
-            reference_template=reference_template,
-            high_risk_ref=high_risk_ref,
-        )
+        if len(content) > MAX_CHUNK_CHARS:
+            logger.info(f"文件内容超过{MAX_CHUNK_CHARS}字，启用分段审核")
+            audit_result = await audit_eval_chunked(
+                content=content,
+                control_point=control_point,
+                object_type=object_type,
+                result_type=result_type,
+                reference_template=reference_template,
+                high_risk_ref=high_risk_ref,
+                on_progress=_progress_callback,
+                on_thinking=on_thinking,
+            )
+        else:
+            audit_result = await audit_eval_description(
+                content=content,
+                control_point=control_point,
+                object_type=object_type,
+                result_type=result_type,
+                reference_template=reference_template,
+                high_risk_ref=high_risk_ref,
+                on_thinking=on_thinking,
+            )
     except Exception as e:
         logger.error(f"审核引擎调用失败: {e}")
         return ToolResult(
@@ -261,36 +282,26 @@ async def handle_search_vulnerability(
                     })
     except Exception as e:
         logger.warning(f"请求NVD API失败: {e}")
-        
-    # 如果NVD网络不通或达到速率限制，返回合理的Mock数据兜底，保障业务演示体验
+        _log_query("vulnerability_search", keyword, "NVD API请求失败")
+        return ToolResult(
+            success=False,
+            summary=f"漏洞搜索失败：无法连接NVD漏洞库（网络异常），请稍后重试",
+            data={"type": "vulnerability_search", "vulnerabilities": [], "total": 0, "returned": 0, "error": "network"}
+        )
+
     if not vulnerabilities:
-        if "Log4j" in keyword or "44228" in keyword:
-            vulnerabilities.append({
-                "cve_id": "CVE-2021-44228",
-                "cvss_score": 10.0,
-                "cvss_severity": "CRITICAL",
-                "description": "Apache Log4j2 JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints."
-            })
-        elif "OpenSSL" in keyword:
-            vulnerabilities.append({
-                "cve_id": "CVE-2014-0160",
-                "cvss_score": 7.5,
-                "cvss_severity": "HIGH",
-                "description": "The (1) TLS and (2) DTLS implementations in OpenSSL 1.0.1 before 1.0.1g do not properly handle Heartbeat Extension packets, which allows remote attackers to obtain sensitive information from process memory (aka the Heartbleed bug)."
-            })
-        else:
-            vulnerabilities.append({
-                "cve_id": f"CVE-2024-{hash(keyword) % 9000 + 1000}",
-                "cvss_score": 7.2,
-                "cvss_severity": "HIGH",
-                "description": f"Vulnerability related to {keyword} allows remote attackers to cause denial of service or code execution."
-            })
+        _log_query("vulnerability_search", keyword, "未找到匹配漏洞")
+        return ToolResult(
+            success=True,
+            summary=f"在NVD漏洞库中未搜索到与\u201c{keyword}\u201d相关的漏洞记录",
+            data={"type": "vulnerability_search", "vulnerabilities": [], "total": 0, "returned": 0}
+        )
 
     _log_query("vulnerability_search", keyword, f"找到 {len(vulnerabilities)} 个漏洞")
 
     return ToolResult(
         success=True,
-        summary=f"搜索到关于“{keyword}”的 {len(vulnerabilities)} 个漏洞记录",
+        summary=f"在NVD漏洞库中搜索到关于\u201c{keyword}\u201d的 {len(vulnerabilities)} 个漏洞记录",
         data={
             "type": "vulnerability_search",
             "vulnerabilities": vulnerabilities,
@@ -361,24 +372,26 @@ async def handle_get_vulnerability_detail(
                     }
     except Exception as e:
         logger.warning(f"请求NVD API详情失败: {e}")
+        _log_query("vulnerability_detail", cve_id, "NVD API请求失败")
+        return ToolResult(
+            success=False,
+            summary=f"获取 {cve_id} 详情失败：无法连接NVD漏洞库（网络异常），请稍后重试",
+            data={"type": "vulnerability_detail", "vulnerability": None, "error": "network"}
+        )
 
-    # Fallback Mock
     if not vuln_detail:
-        vuln_detail = {
-            "cve_id": cve_id,
-            "cvss_score": 10.0 if "44228" in cve_id else 7.5,
-            "cvss_severity": "CRITICAL" if "44228" in cve_id else "HIGH",
-            "description": f"Detailed vulnerability description for {cve_id}. (Mock data due to NVD API network issue)",
-            "full_description": f"The vulnerability {cve_id} allows unauthenticated remote attackers to execute arbitrary code. Please update to the latest patched version immediately.",
-            "cwes": ["CWE-20", "CWE-94"] if "44228" in cve_id else ["CWE-UNKNOWN"],
-            "affected_products": [{"vendor": "apache", "product": "log4j2"}] if "44228" in cve_id else []
-        }
+        _log_query("vulnerability_detail", cve_id, "NVD中未收录该CVE")
+        return ToolResult(
+            success=True,
+            summary=f"NVD漏洞库中未收录 {cve_id}，该CVE编号可能不存在或尚未公开",
+            data={"type": "vulnerability_detail", "vulnerability": None, "not_found": True}
+        )
 
     _log_query("vulnerability_detail", cve_id, f"获取到 {cve_id} 详情")
 
     return ToolResult(
         success=True,
-        summary=f"已成功获取 {cve_id} 的漏洞详情",
+        summary=f"已获取 {cve_id} 的漏洞详情",
         data={
             "type": "vulnerability_detail",
             "vulnerability": vuln_detail

@@ -85,8 +85,9 @@ REPLY_SYSTEM_PROMPT = """你是「等保测评助手」，一个专业的网络�
 规则：
 - 审核结果：先给总体结论，再逐项列出问题和建议
 - 国标条款：基于条款原文回答，标注来源（如"依据GB/T 22239-2019"）
-- 漏洞信息：包含CVE编号、CVSS评分、影响范围、修复建议
-- 不编造数据，工具返回空则如实告知
+- 漏洞信息：**严格只基于工具返回的数据进行整理展示**，包含CVE编号、CVSS评分、影响范围、修复建议
+- **绝对禁止编造**：不得编造任何工具未返回的CVE编号、漏洞描述、评分、产品名等信息
+- 工具返回空或失败时，如实告知用户"未查询到相关信息"，不得自行补充
 - 回复用中文，格式用Markdown"""
 
 
@@ -267,6 +268,38 @@ def _format_audit_reply(audit_payload: Dict[str, Any]) -> str:
     return "\n".join(lines).strip()
 
 
+def _try_fixed_vulnerability_reply(tool_results: list) -> Optional[str]:
+    """漏洞查询结果为空或失败时，生成固定回复，避免 LLM 编造不存在的漏洞信息"""
+    for tool_name, result in tool_results:
+        if not result.success:
+            return f"**查询失败**\n\n{result.summary}\n\n请检查网络连接后重试，或确认输入的漏洞信息是否正确。"
+        if result.data:
+            data = result.data
+            if data.get("not_found"):
+                cve_id = (data.get("vulnerability") or {}).get("cve_id", "") if data.get("vulnerability") else ""
+                if not cve_id and "cve_id" in str(result.summary):
+                    cve_id = ""
+                return (
+                    f"**未找到漏洞信息**\n\n"
+                    f"{result.summary}\n\n"
+                    f"可能的原因：\n"
+                    f"- 该CVE编号不存在或输入有误\n"
+                    f"- 该漏洞尚未被NVD收录\n"
+                    f"- NVD数据库更新延迟\n\n"
+                    f"建议核实CVE编号后重新查询。"
+                )
+            if data.get("type") == "vulnerability_search" and data.get("total", 0) == 0:
+                return (
+                    f"**未搜索到相关漏洞**\n\n"
+                    f"{result.summary}\n\n"
+                    f"建议：\n"
+                    f"- 检查关键词拼写是否正确\n"
+                    f"- 尝试更通用的关键词（如产品名、协议名）\n"
+                    f"- 确认CVE编号格式是否正确（如 CVE-2021-44228）"
+                )
+    return None
+
+
 def _split_text_for_stream(text: str, chunk_size: int = 120) -> List[str]:
     if not text:
         return [""]
@@ -330,12 +363,14 @@ class AgentEngine:
         # 最高优先级：只要带有附件内容，直接强行进入报告审核（简化用户心智）
         if "【附件内容：" in user_message:
             logger.info("[Intent-Stream] 检测到附件，默认强制使用 audit_report 意图")
+            yield {"type": "thinking", "text": "检测到上传的附件文件，将进行等保测评报告审核...\n"}
             yield {"type": "result", "data": {"intent": "audit_report", "params": {"content": user_message}}}
             return
 
         # 优先：上下文感知检测修改反馈
         last_action = _detect_last_action(history)
         if _is_modification_feedback(user_message, last_action):
+            yield {"type": "thinking", "text": "识别为修改反馈，将基于上下文回复...\n"}
             yield {"type": "result", "data": {"intent": "chat", "params": {"message": user_message}}}
             return
 
@@ -378,13 +413,12 @@ class AgentEngine:
             logger.warning(f"流式意图识别异常: {e}")
             yield {"type": "result", "data": _keyword_fallback_intent(user_message, history)}
 
-    async def _execute_tools(self, intent: str, params: dict, user_message: str = "", db=None) -> List[Dict]:
+    async def _execute_tools(self, intent: str, params: dict, user_message: str = "", db=None, on_thinking=None) -> List[Dict]:
         """Step2: 根据意图执行工具（程序化分发，不依赖LLM）"""
         results = []
 
         if intent == "audit_report":
             content = params.get("content", "")
-            # 优先从原文本切分附件（解决LLM因长文无法装入JSON单字段而生成摘要幻觉导致相同结论等Bug）
             if "【附件内容：" in user_message:
                 parts = user_message.split("】\n", 1)
                 content = parts[-1].strip() if len(parts) > 1 else content
@@ -395,11 +429,17 @@ class AgentEngine:
             if cp:
                 r = await self.tools.execute("check_item", {"control_point": cp, "object_type": params.get("object_type", "")}, db=db)
                 results.append(("check_item", r))
+
+            extra_kwargs = {}
+            if on_thinking:
+                extra_kwargs["on_thinking"] = on_thinking
+
             r = await self.tools.execute("audit_report", {
                 "content": content,
                 "control_point": cp,
                 "object_type": params.get("object_type", ""),
                 "result_type": params.get("result_type", ""),
+                **extra_kwargs,
             }, db=db)
             results.append(("audit_report", r))
 
@@ -534,8 +574,38 @@ class AgentEngine:
             yield AgentStreamEvent(type="done", data={})
             return
 
-        # Step2: 执行工具
-        tool_results = await self._execute_tools(intent, params, user_message=user_message, db=db)
+        # Step2: 执行工具（审核工具通过队列实时推送思考过程）
+        import asyncio
+        thinking_queue: asyncio.Queue = asyncio.Queue()
+
+        async def _on_thinking(text: str):
+            await thinking_queue.put(text)
+
+        if intent == "audit_report":
+            yield AgentStreamEvent(type="tool_calling", data={"tool": "audit_report", "args": params, "status": "starting"})
+            yield AgentStreamEvent(type="thinking_content", data={"text": "正在审核测评报告，请稍候...\n"})
+
+        async def _run_tools():
+            if intent == "audit_report":
+                return await self._execute_tools(intent, params, user_message=user_message, db=db, on_thinking=_on_thinking)
+            return await self._execute_tools(intent, params, user_message=user_message, db=db)
+
+        tool_task = asyncio.create_task(_run_tools())
+
+        if intent == "audit_report":
+            while not tool_task.done():
+                try:
+                    text = await asyncio.wait_for(thinking_queue.get(), timeout=0.5)
+                    yield AgentStreamEvent(type="thinking_content", data={"text": text + "\n"})
+                except asyncio.TimeoutError:
+                    continue
+
+        tool_results = await tool_task
+
+        while not thinking_queue.empty():
+            text = thinking_queue.get_nowait()
+            yield AgentStreamEvent(type="thinking_content", data={"text": text + "\n"})
+
         tool_context = ""
         structured_data_list = []
 
@@ -560,6 +630,15 @@ class AgentEngine:
                 yield AgentStreamEvent(type="content", data={"text": chunk})
             yield AgentStreamEvent(type="done", data={})
             return
+
+        # 漏洞查询：工具返回空/失败时，直接固定回复，禁止LLM编造
+        if intent in ("search_vulnerability", "get_vulnerability_detail"):
+            vuln_fixed = _try_fixed_vulnerability_reply(tool_results)
+            if vuln_fixed:
+                for chunk in _split_text_for_stream(vuln_fixed):
+                    yield AgentStreamEvent(type="content", data={"text": chunk})
+                yield AgentStreamEvent(type="done", data={})
+                return
 
         # Step3: 流式生成回复
         messages = [

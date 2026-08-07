@@ -1,10 +1,14 @@
 """审核引擎 — 等保测评报告内容审核核心逻辑"""
 import json
-from typing import Dict, Any, List, Optional
+import re
+from typing import Dict, Any, List, Optional, Callable, Awaitable
 
 from loguru import logger
 
 from app.core.llm import llm_service
+
+MAX_CHUNK_CHARS = 50000
+SEGMENT_OVERLAP = 200
 
 
 AUDIT_PROMPT = """你是一个专业的等保测评报告审核专家（依据GB/T 22239-2019、GB/T 28448-2019、GB/T 28449-2018）。
@@ -127,6 +131,7 @@ async def audit_eval_description(
     result_type: str = "",
     reference_template: str = "",
     high_risk_ref: str = "",
+    on_thinking=None,
 ) -> Dict[str, Any]:
     """
     审核测评描述
@@ -136,6 +141,7 @@ async def audit_eval_description(
     :param result_type: 测评结论
     :param reference_template: 参考描述模板
     :param high_risk_ref: 高风险判例参考
+    :param on_thinking: 可选的异步回调，用于推送思考过程
     :return: 审核结果
     """
     messages = [
@@ -151,7 +157,7 @@ async def audit_eval_description(
     ]
 
     try:
-        result = await llm_service.chat_json(messages)
+        result = await llm_service.chat_json(messages, on_thinking=on_thinking)
         if "error" not in result:
             return result
     except Exception as e:
@@ -233,3 +239,160 @@ def _basic_audit(content: str, result_type: str, reference_template: str) -> Dic
         "high_risk_warning": None,
         "summary": f"基础审核完成，发现{len(issues)}个问题。" if issues else "基础审核通过，未发现明显问题。",
     }
+
+
+def _split_content_by_sections(content: str, max_chars: int = MAX_CHUNK_CHARS) -> List[str]:
+    """按等保控制点/章节拆分内容；如无明确章节则按字数均分"""
+    if len(content) <= max_chars:
+        return [content]
+
+    section_patterns = [
+        r'(?=\n\d+\.\d+\.\d+\s)',
+        r'(?=\n第[一二三四五六七八九十]+[章节条款])',
+        r'(?=\n#{1,3}\s)',
+        r'(?=\n\d+[\.\、]\s*[^\d])',
+    ]
+
+    chunks = []
+    for pattern in section_patterns:
+        parts = re.split(pattern, content)
+        parts = [p for p in parts if p.strip()]
+        if len(parts) > 1:
+            chunks = _merge_small_parts(parts, max_chars)
+            if chunks:
+                return chunks
+
+    return _split_by_chars(content, max_chars)
+
+
+def _merge_small_parts(parts: List[str], max_chars: int) -> List[str]:
+    """将过小的段落合并到上一个 chunk"""
+    chunks = []
+    current = ""
+    for part in parts:
+        if len(current) + len(part) <= max_chars:
+            current += part
+        else:
+            if current:
+                chunks.append(current)
+            current = part
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _split_by_chars(content: str, max_chars: int) -> List[str]:
+    """按字数均匀拆分，保留段落完整性"""
+    paragraphs = content.split('\n')
+    chunks = []
+    current = ""
+    for para in paragraphs:
+        if len(current) + len(para) + 1 > max_chars and current:
+            chunks.append(current)
+            current = para
+        else:
+            current = current + '\n' + para if current else para
+    if current:
+        chunks.append(current)
+    return chunks if chunks else [content]
+
+
+def _merge_audit_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """合并多段审核结果为一个总体结论"""
+    all_issues = []
+    all_highlights = []
+    high_risk_warnings = []
+    scores = []
+    summaries = []
+
+    for r in results:
+        all_issues.extend(r.get("issues", []))
+        all_highlights.extend(r.get("highlights", []))
+        if r.get("high_risk_warning"):
+            high_risk_warnings.append(r["high_risk_warning"])
+        if r.get("score") is not None:
+            scores.append(r["score"])
+        if r.get("summary"):
+            summaries.append(r["summary"])
+
+    seen_issues = []
+    seen_keys = set()
+    for issue in all_issues:
+        key = f"{issue.get('dimension', '')}|{issue.get('description', '')[:50]}"
+        if key not in seen_keys:
+            seen_keys.add(key)
+            seen_issues.append(issue)
+
+    avg_score = int(sum(scores) / len(scores)) if scores else 0
+    if any(i.get("severity") == "high" for i in seen_issues):
+        avg_score = min(avg_score, 60)
+
+    if not seen_issues:
+        overall = "通过"
+    elif avg_score >= 60:
+        overall = "需修改"
+    else:
+        overall = "存在问题"
+
+    high_risk = "; ".join(high_risk_warnings) if high_risk_warnings else None
+    if high_risk:
+        overall = "存在问题"
+
+    return {
+        "overall_result": overall,
+        "score": avg_score,
+        "issues": seen_issues,
+        "highlights": list(set(all_highlights)),
+        "high_risk_warning": high_risk,
+        "summary": f"分段审核完成（共{len(results)}段），发现{len(seen_issues)}个问题。" + (summaries[0] if summaries else ""),
+    }
+
+
+async def audit_eval_chunked(
+    content: str,
+    control_point: str = "",
+    object_type: str = "",
+    result_type: str = "",
+    reference_template: str = "",
+    high_risk_ref: str = "",
+    on_progress: Optional[Callable[[int, int], Awaitable[None]]] = None,
+    on_thinking=None,
+) -> Dict[str, Any]:
+    """
+    分段审核：将大文件拆分成多段，逐段送审，合并结论。
+    on_progress(current, total) 用于向前端汇报进度。
+    on_thinking: 可选异步回调，推送LLM思考过程。
+    """
+    chunks = _split_content_by_sections(content)
+    total = len(chunks)
+
+    if total == 1:
+        return await audit_eval_description(
+            content=content,
+            control_point=control_point,
+            object_type=object_type,
+            result_type=result_type,
+            reference_template=reference_template,
+            high_risk_ref=high_risk_ref,
+            on_thinking=on_thinking,
+        )
+
+    logger.info(f"分段审核：文件拆分为 {total} 段")
+    results = []
+
+    for idx, chunk in enumerate(chunks, 1):
+        if on_progress:
+            await on_progress(idx, total)
+
+        chunk_result = await audit_eval_description(
+            content=chunk,
+            control_point=control_point,
+            object_type=object_type,
+            result_type=result_type,
+            reference_template=reference_template,
+            high_risk_ref=high_risk_ref,
+            on_thinking=on_thinking,
+        )
+        results.append(chunk_result)
+
+    return _merge_audit_results(results)

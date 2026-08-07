@@ -256,9 +256,19 @@ class LLMService:
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.1,
+        on_thinking=None,
     ) -> dict:
-        """JSON格式输出的对话"""
-        result = await self.chat(messages, temperature=temperature)
+        """JSON格式输出的对话，支持 on_thinking 回调推送思考过程"""
+        if on_thinking:
+            content_buf = ""
+            async for piece in self.chat_stream_with_thinking(messages):
+                if piece["type"] == "thinking":
+                    await on_thinking(piece["text"])
+                else:
+                    content_buf += piece["text"]
+            result = content_buf
+        else:
+            result = await self.chat(messages, temperature=temperature)
         try:
             text = _strip_think(result).strip()
             if text.startswith("```json"):
