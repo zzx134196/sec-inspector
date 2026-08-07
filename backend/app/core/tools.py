@@ -69,7 +69,7 @@ async def handle_audit_report(
 
     async def _progress_callback(current: int, total: int):
         if on_thinking:
-            await on_thinking(f"正在审核第 {current}/{total} 段...")
+            await on_thinking(f"\n正在审核第 {current}/{total} 段...\n")
 
     try:
         if len(content) > MAX_CHUNK_CHARS:

@@ -570,7 +570,7 @@ class AgentEngine:
             while not tool_task.done():
                 try:
                     text = await asyncio.wait_for(thinking_queue.get(), timeout=0.5)
-                    yield AgentStreamEvent(type="thinking_content", data={"text": text + "\n"})
+                    yield AgentStreamEvent(type="thinking_content", data={"text": text})
                 except asyncio.TimeoutError:
                     continue
 
@@ -578,7 +578,7 @@ class AgentEngine:
 
         while not thinking_queue.empty():
             text = thinking_queue.get_nowait()
-            yield AgentStreamEvent(type="thinking_content", data={"text": text + "\n"})
+            yield AgentStreamEvent(type="thinking_content", data={"text": text})
 
         tool_context = ""
         structured_data_list = []
