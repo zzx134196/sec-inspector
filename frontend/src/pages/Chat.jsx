@@ -537,7 +537,7 @@ function MessageBubble({ msg }) {
 
 function StreamStatusIndicator({ status }) {
   return (
-    <div style={{ marginBottom: 16, marginLeft: 44 }}>
+    <div style={{ marginBottom: 16, maxWidth: 800, margin: '0 auto 16px', paddingLeft: 44 }}>
       {status.thinking && (
         <div className="flex-gap-8" style={{ display: 'flex', alignItems: 'center', color: '#999', fontSize: 13, marginBottom: 6 }}>
           <LoadingOutlined spin />
@@ -545,7 +545,7 @@ function StreamStatusIndicator({ status }) {
         </div>
       )}
       {(status.toolCalls || []).map((tc, i) => (
-        <div key={i} className="tool-call-card">
+        <div key={i} className="tool-call-card" style={{ maxWidth: '78%' }}>
           <Space>
             <ToolOutlined />
             <span className="tool-name">{TOOL_NAMES[tc.tool] || tc.tool}</span>
