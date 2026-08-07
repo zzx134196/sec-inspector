@@ -159,12 +159,55 @@ async def audit_eval_description(
     try:
         result = await llm_service.chat_json(messages, on_thinking=on_thinking)
         if "error" not in result:
-            return result
+            return _validate_audit_result(result)
     except Exception as e:
         logger.error(f"审核LLM调用失败: {e}")
 
     # LLM失败时返回基础审核
     return _basic_audit(content, result_type, reference_template)
+
+
+def _validate_audit_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    """校验并修正LLM审核结果的一致性"""
+    issues = result.get("issues") or []
+    high_risk = result.get("high_risk_warning")
+    overall = result.get("overall_result", "")
+    score = result.get("score", 0)
+
+    high_count = sum(1 for i in issues if i.get("severity") == "high")
+    medium_count = sum(1 for i in issues if i.get("severity") == "medium")
+
+    # 修正1：有高风险提醒或high级issues时，不能是"通过"
+    if (high_risk or high_count > 0) and overall == "通过":
+        result["overall_result"] = "存在问题"
+        if score > 70:
+            result["score"] = min(score, 65)
+
+    # 修正2：有medium级issues时，不能是"通过"
+    if medium_count >= 2 and overall == "通过":
+        result["overall_result"] = "需修改"
+        if score > 85:
+            result["score"] = min(score, 80)
+
+    # 修正3：score与overall_result的对应关系
+    overall = result.get("overall_result", "")
+    score = result.get("score", 0)
+    if overall == "通过" and score < 60:
+        result["overall_result"] = "存在问题"
+    elif overall == "存在问题" and score > 80:
+        result["score"] = min(score, 60)
+    elif overall == "需修改" and score > 90:
+        result["score"] = min(score, 80)
+
+    # 修正4：清理summary中LLM自行添加的截断提示
+    summary = result.get("summary", "")
+    if summary:
+        import re
+        summary = re.sub(r'\[注意[：:].*?\]', '', summary).strip()
+        summary = re.sub(r'（注意[：:].*?）', '', summary).strip()
+        result["summary"] = summary
+
+    return result
 
 
 async def check_logic_consistency(
