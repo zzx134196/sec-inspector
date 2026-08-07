@@ -128,6 +128,7 @@ export default function ChatPage() {
     let finalMsg = msg
     if (pendingAttachment) {
       finalMsg = msg + ATTACHMENT_MARKER + pendingAttachment.name + ATTACHMENT_END_MARKER + pendingAttachment.content
+      setUploadedFile(null)
     }
 
     const userMsgId = Date.now()
