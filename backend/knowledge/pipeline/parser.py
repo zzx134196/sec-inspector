@@ -20,15 +20,31 @@ def parse_document(file_path: str) -> str:
     file_ext = Path(file_path).suffix.lower()
 
     if file_ext == ".pdf":
-        return _parse_pdf(file_path)
+        text = _parse_pdf(file_path)
     elif file_ext == ".docx":
-        return _parse_docx(file_path)
+        text = _parse_docx(file_path)
     elif file_ext in (".doc", ".wps"):
-        return _parse_doc(file_path)
+        text = _parse_doc(file_path)
     elif file_ext == ".txt":
-        return _parse_txt(file_path)
+        text = _parse_txt(file_path)
     else:
         raise ValueError(f"不支持的文件格式: {file_ext}")
+
+    text = _clean_parsed_text(text)
+    return text
+
+
+def _clean_parsed_text(text: str) -> str:
+    """清理解析后的文本，移除不可打印字符"""
+    if not text:
+        return text
+    cleaned = ''.join(
+        ch for ch in text
+        if ch.isprintable() or ch in ('\n', '\r', '\t')
+    )
+    if len(cleaned) < len(text) * 0.5:
+        logger.warning(f"解析文本含大量不可打印字符({len(text) - len(cleaned)}个已移除)，可能为扫描件PDF")
+    return cleaned
 
 
 def _parse_pdf(file_path: str) -> str:

@@ -566,23 +566,57 @@ function StructuredDataCard({ data }) {
 
   if (type === 'audit_result' && data.audit) {
     const audit = data.audit
+    const issues = audit.issues || []
+    const highlights = (audit.highlights || []).filter(Boolean)
     return (
-      <div style={{ marginTop: 10, padding: 12, background: '#fff', borderRadius: 8, border: '1px solid #e8e8e8' }}>
-        <div className="flex-gap-8" style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-          <Tag color={audit.overall_result === '通过' ? 'green' : audit.overall_result === '需修改' ? 'orange' : 'red'}>
+      <div style={{ marginTop: 10, padding: 14, background: '#fff', borderRadius: 10, border: '1px solid #e8e8e8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        {/* 总体结论区 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid #f0f0f0' }}>
+          <Tag color={audit.overall_result === '通过' ? 'green' : audit.overall_result === '需修改' ? 'orange' : 'red'} style={{ fontSize: 13, padding: '2px 10px' }}>
             {audit.overall_result}
           </Tag>
-          <Text strong>评分: {audit.score}</Text>
+          <Text strong style={{ fontSize: 14 }}>评分: {audit.score ?? '暂无'}</Text>
         </div>
-        {(audit.issues || []).map((issue, i) => (
-          <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}>
-            <Tag color={issue.severity === 'high' ? 'red' : issue.severity === 'medium' ? 'orange' : 'blue'} style={{ fontSize: 11 }}>
-              {issue.dimension}
-            </Tag>
-            <span>{issue.description}</span>
-            {issue.suggestion && <div style={{ color: '#1677ff', marginTop: 2, fontSize: 12 }}>建议: {issue.suggestion}</div>}
+        {/* 高风险提醒 */}
+        {audit.high_risk_warning && (
+          <div style={{ padding: '8px 12px', background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 6, marginBottom: 10, fontSize: 13, color: '#cf1322' }}>
+            ⚠️ <strong>高风险提醒：</strong>{audit.high_risk_warning}
           </div>
-        ))}
+        )}
+        {/* 总体评价 */}
+        {audit.summary && (
+          <div style={{ fontSize: 13, color: '#555', marginBottom: 10, lineHeight: 1.7 }}>
+            {audit.summary}
+          </div>
+        )}
+        {/* 问题列表 */}
+        {issues.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <Text strong style={{ fontSize: 13, color: '#333' }}>问题清单（{issues.length} 项）</Text>
+            {issues.map((issue, i) => (
+              <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Tag color={issue.severity === 'high' ? 'red' : issue.severity === 'medium' ? 'orange' : 'blue'} style={{ fontSize: 11 }}>
+                    {issue.severity === 'high' ? '高' : issue.severity === 'medium' ? '中' : '低'}
+                  </Tag>
+                  <Text strong style={{ fontSize: 12 }}>{issue.dimension}</Text>
+                </div>
+                <div style={{ color: '#333', marginBottom: 3 }}>{issue.description}</div>
+                {issue.suggestion && <div style={{ color: '#1677ff', fontSize: 12 }}>💡 建议: {issue.suggestion}</div>}
+                {issue.location && <div style={{ color: '#999', fontSize: 11, marginTop: 2 }}>📍 定位: {issue.location.slice(0, 100)}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        {/* 亮点 */}
+        {highlights.length > 0 && issues.length === 0 && (
+          <div>
+            <Text strong style={{ fontSize: 13, color: '#52c41a' }}>✅ 亮点</Text>
+            {highlights.map((h, i) => (
+              <div key={i} style={{ fontSize: 12, color: '#555', padding: '2px 0' }}>• {h}</div>
+            ))}
+          </div>
+        )}
       </div>
     )
   }

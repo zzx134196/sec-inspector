@@ -225,47 +225,21 @@ def _has_attachment_content(user_message: str) -> bool:
 
 
 def _format_audit_reply(audit_payload: Dict[str, Any]) -> str:
+    """生成简洁的审核回复文本（详细信息由前端结构化卡片展示）"""
     audit = audit_payload.get("audit") or {}
     overall = audit.get("overall_result", "未知")
     score = audit.get("score", 0)
-    summary = audit.get("summary", "")
-    high_risk_warning = audit.get("high_risk_warning")
-    highlights = [item for item in (audit.get("highlights") or []) if item]
     issues = audit.get("issues") or []
+    high_risk_warning = audit.get("high_risk_warning")
 
-    lines = [
-        "# 等保测评报告审核结果",
-        "",
-        "## 一、总体结论",
-        f"- **测评结果**：{overall}（{score}分）",
-    ]
-    if high_risk_warning:
-        lines.append(f"- **高风险提醒**：{high_risk_warning}")
-    if summary:
-        lines.append(f"- **总体评价**：{summary}")
-
+    line = f"审核完成，结果：**{overall}**（{score}分）"
     if issues:
-        lines.extend(["", "## 二、问题与建议"])
-        for index, issue in enumerate(issues, start=1):
-            dimension = issue.get("dimension") or "未分类"
-            severity = issue.get("severity") or "medium"
-            description = issue.get("description") or "未提供问题描述"
-            suggestion = issue.get("suggestion") or "建议补充与当前测评对象相关的核查依据和整改措施"
-            location = issue.get("location") or ""
-            lines.append(f"### {index}. {dimension}（{severity}）")
-            lines.append(f"- **问题描述**：{description}")
-            lines.append(f"- **修改建议**：{suggestion}")
-            if location:
-                lines.append(f"- **原文定位**：{location}")
-            lines.append("")
-    elif highlights:
-        lines.extend(["", "## 二、亮点"])
-        for item in highlights:
-            lines.append(f"- {item}")
+        line += f"，发现 {len(issues)} 个问题。"
+    elif high_risk_warning:
+        line += f"，存在高风险提醒。"
     else:
-        lines.extend(["", "## 二、审核说明", "- 当前未识别到明确问题，请结合原文与标准条款进一步复核。"])
-
-    return "\n".join(lines).strip()
+        line += "。"
+    return line
 
 
 def _try_fixed_vulnerability_reply(tool_results: list) -> Optional[str]:
